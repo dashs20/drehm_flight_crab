@@ -1,7 +1,7 @@
 #include <SPI.h>
 #include <SD.h>
 
-const int chipSelect = 10;    // Adjust if your SD card module uses a different CS pin
+const int chipSelect = 4;    // Updated: CS is now on pin 4
 File logFile;
 
 // Buffer settings: adjust based on available RAM and expected message size
@@ -15,15 +15,17 @@ unsigned long lastFlushTime = 0;
 
 void setup() {
   // Initialize the hardware Serial at 500000 baud.
-  // Note: This port is used for both receiving data and (if connected via USB) for debugging.
+  // This port is used for both receiving data and (if connected via USB) for debugging.
   Serial.begin(500000);
   
-  // Optional: Wait for the serial port to connect (only needed for some boards)
+  // Wait for the serial port to connect (optional, for some boards)
   while (!Serial) { }
 
   Serial.println("Initializing SD card...");
 
-  // Initialize the SD card
+  delay(5000);
+
+  // Initialize the SD card using chipSelect on pin 4
   if (!SD.begin(chipSelect)) {
     Serial.println("SD card initialization failed!");
     while (1);  // Halt execution if the SD card isn't working

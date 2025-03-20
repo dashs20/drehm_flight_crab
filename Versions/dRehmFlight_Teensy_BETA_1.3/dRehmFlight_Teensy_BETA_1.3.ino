@@ -405,6 +405,8 @@ void setup() {
 //========================================================================================================================//
 //                                                       MAIN LOOP                                                        //                           
 //========================================================================================================================//
+
+int counter = 1;
                                                   
 void loop() {
   //Keep track of what time it is and how much time has elapsed since the last loop
@@ -421,8 +423,8 @@ void loop() {
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
-  //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-  printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
+  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
+  //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
   //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
@@ -461,6 +463,17 @@ void loop() {
   //Get vehicle commands for next loop iteration
   getCommands(); //Pulls current available radio commands
   failSafe(); //Prevent failures in event of bad receiver connection, defaults to failsafe values assigned in setup
+
+  //Transmit culled data on Serial 4
+  if(counter == 2000) {
+    counter = 1;
+    // log data
+    Serial4.print("gyro:");Serial4.print(GyroX);Serial4.print(",");Serial4.print(GyroY);Serial4.print(",");Serial4.print(GyroZ);
+    Serial4.print("cmd:");Serial4.print(roll_des);Serial4.print(",");Serial4.print(pitch_des);Serial4.print(",");Serial4.println(yaw_des);
+  }
+  else {
+    counter += 1;
+  }
 
   //Regulate loop rate
   loopRate(2000); //Do not exceed 2000Hz, all filter parameters tuned to 2000Hz by default
@@ -543,8 +556,8 @@ void controlMixer() {
 //    Serial.println(scaled_delta);
   
   //Send the commands
-  m1_command_scaled = thro_des - delta; //Front
-  m2_command_scaled = thro_des + delta; //Back
+  m1_command_scaled = thro_des - scaled_delta; //Front
+  m2_command_scaled = thro_des + scaled_delta; //Back
   m3_command_scaled = 0;
   m4_command_scaled = 0;
   m5_command_scaled = 0;

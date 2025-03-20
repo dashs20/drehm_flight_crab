@@ -1,70 +1,47 @@
 #include <SPI.h>
 #include <SD.h>
 
-const int chipSelect = 4;    // Updated: CS is now on pin 4
-File logFile;
-
-// Buffer settings: adjust based on available RAM and expected message size
-#define BUFFER_SIZE 512
-char buffer[BUFFER_SIZE];
-int bufferIndex = 0;
-
-// Flush interval (in milliseconds) to force a write even if the buffer isn’t full
-const unsigned long flushInterval = 500;
-unsigned long lastFlushTime = 0;
+const int chipSelect = 4;         // SD card chip select pin
+const char *filename = "datalog.txt";
+const unsigned int bufferSize = 128;
+char dataBuffer[bufferSize];
+unsigned int bufferIndex = 0;
 
 void setup() {
-  // Initialize the hardware Serial at 500000 baud.
-  // This port is used for both receiving data and (if connected via USB) for debugging.
-  Serial.begin(500000);
-  
-  // Wait for the serial port to connect (optional, for some boards)
-  while (!Serial) { }
+  Serial.begin(115200);
+  // Wait for the serial port to connect (for boards with native USB, if needed)
+  while (!Serial) { ; }
 
   Serial.println("Initializing SD card...");
 
-  delay(5000);
-
-  // Initialize the SD card using chipSelect on pin 4
   if (!SD.begin(chipSelect)) {
     Serial.println("SD card initialization failed!");
-    while (1);  // Halt execution if the SD card isn't working
+    while (1); // halt execution if SD card fails
   }
   Serial.println("SD card initialized.");
-
-  // Open (or create) the log file for appending
-  logFile = SD.open("datalog.txt", FILE_WRITE);
-  if (!logFile) {
-    Serial.println("Error opening datalog.txt");
-    while (1);
-  }
-  
-  lastFlushTime = millis();
 }
 
 void loop() {
-  // Read incoming serial data as long as data is available
+  // Read available data from the Serial port
   while (Serial.available() > 0) {
     char c = Serial.read();
-    if (bufferIndex < BUFFER_SIZE - 1) {  // Reserve space for null terminator
-      buffer[bufferIndex++] = c;
-    } else {
-      // Buffer full: flush immediately to free up space
-      buffer[bufferIndex] = '\0'; // Null-terminate the string
-      logFile.print(buffer);
-      logFile.flush();  // Write immediately to the SD card
-      bufferIndex = 0;
+    dataBuffer[bufferIndex++] = c;
+
+    // When a newline or near-buffer-full is reached, write the data to the SD card.
+    if (c == '\n' || bufferIndex >= bufferSize - 1) {
+      dataBuffer[bufferIndex] = '\0'; // Null-terminate the string
+
+      // Open the file in append mode
+      File dataFile = SD.open(filename, FILE_WRITE);
+      if (dataFile) {
+        dataFile.print(dataBuffer);
+        dataFile.close();  // Make sure to close the file to save data
+        Serial.print("Logged: ");
+        Serial.print(dataBuffer); // Optional: print logged data for debugging
+      } else {
+        Serial.println("Error opening datalog.txt for writing");
+      }
+      bufferIndex = 0; // Reset the buffer index after writing
     }
-  }
-  
-  // Flush the buffer periodically even if it isn’t full
-  if (millis() - lastFlushTime >= flushInterval) {
-    if (bufferIndex > 0) {
-      buffer[bufferIndex] = '\0';
-      logFile.print(buffer);
-      logFile.flush();
-      bufferIndex = 0;
-    }
-    lastFlushTime = millis();
   }
 }

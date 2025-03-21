@@ -326,8 +326,8 @@ bool armedFly = false;
 //========================================================================================================================//
 
 void setup() {
-  Serial.begin(115200); //USB serial
-  Serial4.begin(115200); //Blackbox Serial
+  Serial.begin(500000); //USB serial
+  Serial4.begin(500000); //Blackbox Serial
   delay(500);
   
   //Initialize all pins
@@ -408,7 +408,8 @@ void setup() {
 //========================================================================================================================//
 
 int counter = 1;
-                                                  
+int prev_log_time;
+                              
 void loop() {
   //Keep track of what time it is and how much time has elapsed since the last loop
   prev_time = current_time;      
@@ -427,7 +428,7 @@ void loop() {
   //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
   //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
   //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
-  printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
+  //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
   // Get arming status
   armedStatus(); //Check if the throttle cut is off and throttle is low.
@@ -466,16 +467,35 @@ void loop() {
   failSafe(); //Prevent failures in event of bad receiver connection, defaults to failsafe values assigned in setup
 
   //Transmit culled data on Serial 4
-  if(counter == 20) {
-    counter = 1;
-    // log data
-    Serial4.print("gyro:");Serial4.print(GyroX);Serial4.print(",");Serial4.print(GyroY);Serial4.print(",");Serial4.print(GyroZ);
-    Serial4.print(",cmd:");Serial4.print(roll_des);Serial4.print(",");Serial4.print(pitch_des);Serial4.print(",");Serial4.print(yaw_des);
-    Serial4.print(",time:");Serial4.println(current_time);
-  }
-  else {
-    counter += 1;
-  }
+  if (counter == 200) {
+        counter = 1;
+        char buffer[48];  // Smaller buffer = faster send
+
+        // Convert floats to scaled integers (fixed-point representation)
+        int32_t gx = GyroX * 10000;  
+        int32_t gy = GyroY * 10000;
+        int32_t gz = GyroZ * 10000;
+        int32_t rd = roll_des * 10000;
+        int32_t pd = pitch_des * 10000;
+        int32_t yd = yaw_des * 10000;
+
+//        Serial.print(gx);
+//        Serial.print(",");
+//        Serial.print(gy);
+//        Serial.print(",");
+//        Serial.print(gz);
+//        Serial.println();
+        
+        // Format as CSV-style data using fast integer conversion
+        int len = snprintf(buffer, sizeof(buffer), "%d,%d,%d,%d,%d,%d,%d\n",
+                           gx, gy, gz, rd, pd, yd, current_time/10000);
+        
+        //SEND IT IN ONE SHOT (FASTEST POSSIBLE)
+        Serial4.write(buffer, len);
+        Serial.println(buffer);
+    } else {
+        counter++;
+    }
 
   //Regulate loop rate
   loopRate(2000); //Do not exceed 2000Hz, all filter parameters tuned to 2000Hz by default
